@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>캘박 미니게임 - 1 to 50</title>
+  <style>
+    /* Calvak 톤앤매너 색상 적용 */
+    :root {
+      --primary: #FF7F50; /* 오렌지색 */
+      --secondary: #FFA07A;
+      --background: #FFFFFF;
+      --text: #333333;
+      --boardBackground: #F5F5F5;
+      --buttonHover: #FF6347;
+      --gridColor: #FFDAB9;
+      --borderRadius: 12px;
+    }
+
+    /* 모바일 버전 최적화 */
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: manipulation;
+      background-color: #f0f0f0; /* 데스크탑에서 모바일 뷰를 구분하기 위한 배경 */
+    }
+
+    body {
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 480px;
+      width: 100%;
+      height: 100%;
+      background-color: var(--background);
+      position: relative;
+      overflow-y: auto;
+      box-shadow: 0 0 20px rgba(0,0,0,0.05);
+    }
+    
+    .game-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+      height: 100%;
+    }
+
+    .header {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: var(--primary);
+      margin: 10px 0 20px 0;
+      font-size: 2rem;
+    }
+
+    .status-board {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 15px 20px;
+      background-color: var(--boardBackground);
+      border-radius: var(--borderRadius);
+      box-sizing: border-box;
+    }
+
+    .target-info, .timer {
+      font-size: 1.3rem;
+      font-weight: bold;
+    }
+    .timer { color: var(--primary); }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      gap: 8px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-color: var(--gridColor);
+      padding: 8px;
+      border-radius: var(--borderRadius);
+      box-sizing: border-box;
+      margin-top: 10px;
+    }
+
+    .tile-button {
+      background-color: var(--background);
+      border: none;
+      border-radius: 8px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--text);
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: transform 0.1s, background-color 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      aspect-ratio: 1 / 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tile-button:active { transform: scale(0.92); }
+    .tile-button.empty { background-color: transparent; box-shadow: none; cursor: default; }
+    .tile-button.empty:active { transform: none; }
+
+    /* 게임 오버 모달창 */
+    .modal-overlay {
+      position: absolute; /* container 내부에서의 fixed 효과 */
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal {
+      background: white;
+      padding: 30px 20px;
+      width: 85%;
+      border-radius: var(--borderRadius);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      box-sizing: border-box;
+    }
+
+    .result-text {
+      color: var(--primary);
+      margin-bottom: 10px;
+      font-size: 1.6rem;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .btn {
+      color: white; border: none; padding: 14px 20px; border-radius: 25px;
+      font-size: 1.1rem; font-weight: bold; cursor: pointer; width: 100%;
+      box-sizing: border-box; transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.8; }
+    .btn-restart { background-color: var(--primary); }
+    .btn-ranking { background-color: #333; color: white; }
+    .btn-share { background-color: var(--secondary); }
+
+    /* 랭킹 뷰 (다크 테마) */
+    .ranking-view {
+      display: none; 
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #171719; color: #fff;
+      z-index: 200; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .ranking-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-bottom: 100px;
+    }
+
+    .ranking-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #2a2a2a;
+    }
+    .back-btn { cursor: pointer; font-size: 1.5rem; padding: 5px; }
+
+    .top3-container {
+      display: flex; justify-content: center; align-items: flex-end;
+      gap: 12px; padding: 40px 15px 30px;
+    }
+    .top-card {
+      display: flex; flex-direction: column; align-items: center;
+      border-radius: 16px; padding: 15px 5px; flex: 1;
+      position: relative; text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .top-card.first { background-color: #E8F0FE; color: #111; padding-top: 25px; margin-bottom: 25px; }
+    .top-card.second { background-color: #E3E5E8; color: #111; }
+    .top-card.third { background-color: #FCE8E6; color: #111; }
+
+    .crown { position: absolute; font-size: 2rem; top: -25px; left: 50%; transform: translateX(-50%); }
+    .top-card.first .crown { font-size: 2.8rem; top: -35px; }
+
+    .avatar-img { font-size: 3rem; margin: 5px 0; background: rgba(255,255,255,0.5); border-radius: 50%; padding: 5px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
+    .top-name { font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    .top-score { font-size: 0.9rem; color: #E53935; font-weight: bold; margin-bottom: 8px; }
+    .top-tag { font-size: 0.7rem; background: #666; color: white; padding: 4px 10px; border-radius: 12px; font-weight: bold; }
+    .top-card.first .top-tag { background: #FFC107; color: #000; }
+    .top-card.first .top-score { font-size: 1.05rem; }
+
+    .list-container { display: flex; flex-direction: column; padding: 10px 20px; gap: 15px; }
+    .list-item { display: flex; align-items: center; gap: 15px; }
+    .list-rank { display: flex; flex-direction: column; align-items: center; width: 45px; text-align: center; font-size: 1rem; color: #ddd; font-weight: bold; }
+    .list-tag { font-size: 0.65rem; background: #333; padding: 3px 8px; border-radius: 10px; margin-top: 4px; color: #bbb; }
+    .list-avatar { font-size: 1.8rem; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #2c2c2e; }
+    .list-name { flex-grow: 1; font-size: 1rem; font-weight: 500; }
+    .list-score { color: #ff7675; font-weight: bold; font-size: 1rem; }
+
+    .ranking-actions {
+      position: absolute; bottom: 0; left: 0; width: 100%;
+      padding: 20px; display: flex; gap: 10px; box-sizing: border-box;
+      background: linear-gradient(to top, #171719 80%, transparent);
+      z-index: 10;
+    }
+    .btn-rank-back { background: #444; color: #fff; flex: 1; padding: 15px 0; border-radius: 25px; font-weight: bold; font-size: 1.1rem; border: none; cursor: pointer; }
+    .btn-rank-action { background: #FFEB3B; color: #000; flex: 1; padding: 15px 0; border-radius: 25px; font-weight: bold; font-size: 1.1rem; border: none; cursor: pointer; }
+    /* 하이라이트 애니메이션 클래스 */
+    .highlight-my-rank {
+      animation: pulse-border 1.5s infinite;
+      box-shadow: 0 0 15px rgba(255, 127, 80, 0.8) !important;
+      border: 2px solid var(--primary) !important;
+    }
+    
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 10px rgba(255, 127, 80, 0.5); }
+      50% { box-shadow: 0 0 20px rgba(255, 127, 80, 1); }
+      100% { box-shadow: 0 0 10px rgba(255, 127, 80, 0.5); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 게임 화면 -->
+    <div class="game-view" id="game-view">
+      <div class="header">
+        <h1>캘박 1 to 50</h1>
+        <div class="status-board">
+          <div class="target-info" id="target-display">Target: 1</div>
+          <div class="timer" id="timer-display">0.000 sec</div>
+        </div>
+      </div>
+      <div class="grid-container" id="grid"></div>
+    </div>
+
+    <!-- 게임 결과 모달 -->
+    <div class="modal-overlay" id="modal">
+      <div class="modal">
+        <div class="result-text" id="final-time">Clear Time:<br>0.000 sec!</div>
+        <button class="btn btn-restart" onclick="initGame()">다시하기</button>
+        <button class="btn btn-ranking" onclick="showRanking()">랭킹 보기</button>
+        <button class="btn btn-share" onclick="alert('소모임 게시판에 공유되었습니다!')">공유하기 (소모임)</button>
+      </div>
+    </div>
+
+    <!-- 랭킹 화면 -->
+    <div class="ranking-view" id="ranking-view">
+      <div class="ranking-header">
+        <span class="back-btn" onclick="hideRanking()">←</span>
+        <span>실시간 명예의 전당</span>
+        <span style="width:24px"></span> <!-- 우측 여백 맞추기용 -->
+      </div>
+
+      <div class="ranking-content">
+        <!-- 내 랭킹 표시 영역 (스크롤 콘텐츠의 가장 상단에 위치) -->
+        <div class="my-record-section" id="my-record-section" style="display: none; padding: 15px 20px; background-color: rgba(255, 127, 80, 0.15); margin: 10px 15px; border-radius: 12px; border: 1px solid rgba(255, 127, 80, 0.3);">
+          <div style="font-size: 0.85rem; color: var(--primary); margin-bottom: 5px; font-weight: bold;">이번 게임 내 기록</div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="list-avatar" style="background:#555; width: 36px; height: 36px; font-size: 1.2rem;">😎</div>
+              <div class="list-name" style="font-size: 1.1rem; font-weight: bold;">나의 기록</div>
+            </div>
+            <div class="list-score" id="my-final-score" style="font-size: 1.1rem;"></div>
+          </div>
+        </div>
+
+        <div class="top3-container" id="top3-container">
+          <!-- JS에서 동적으로 렌더링 됩니다 -->
+        </div>
+
+        <div class="list-container" id="list-container">
+          <!-- JS에서 동적으로 렌더링 됩니다 -->
+        </div>
+      </div> <!-- End of ranking-content -->
+
+      <div class="ranking-actions">
+        <button class="btn-rank-back" onclick="hideRanking()">돌아가기</button>
+        <button class="btn-rank-action" onclick="alert('랭커의 기록에 도전합니다!')">랭커 따라잡기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentNumber = 1;
+    let isPlaying = false;
+    let startTime = 0;
+    let timerInterval = null;
+    let tiles = [];
+
+    const gridEl = document.getElementById('grid');
+    const targetDisplay = document.getElementById('target-display');
+    const timerDisplay = document.getElementById('timer-display');
+    const modal = document.getElementById('modal');
+    const finalTime = document.getElementById('final-time');
+    const rankingView = document.getElementById('ranking-view');
+    const myRecordSection = document.getElementById('my-record-section');
+    const myFinalScore = document.getElementById('my-final-score');
+    
+    let currentScoreText = '';
+    let currentScoreValue = null;
+
+    // 기본 가상 랭킹 데이터
+    const defaultRankings = [
+      { name: "마산중앙고19기", score: 38.917, emoji: "🐹", bg: "#ffeaa7" },
+      { name: "야속한고라니", score: 45.201, emoji: "🐰", bg: "#f1f1f1" },
+      { name: "매일걷다보면", score: 48.269, emoji: "🐻", bg: "#ffcccc" },
+      { name: "페가수스", score: 51.237, emoji: "🐴", bg: "#a2d2ff" },
+      { name: "빛나는고릴라", score: 53.873, emoji: "🦍", bg: "#81ecec" },
+      { name: "다정한악어904", score: 55.177, emoji: "🐸", bg: "#dfe6e9" },
+      { name: "기운찬침팬지230", score: 56.412, emoji: "🐵", bg: "#fab1a0" },
+      { name: "거거거떡상", score: 58.733, emoji: "🐱", bg: "#ffeaa7" }
+    ];
+
+    function updateRankingView() {
+      // 1. 현재 랭킹 데이터 복사
+      let rankings = [...defaultRankings];
+      
+      // 2. 내 기록이 성공한 기록(숫자)이면 랭킹 배열에 추가
+      if (currentScoreValue !== null) {
+        rankings.push({
+          name: "나의 기록 (😎)",
+          score: currentScoreValue,
+          emoji: "😎",
+          bg: "#555",
+          isMe: true // 내 기록 식별용 플래그
+        });
+      }
+
+      // 3. 기록(score) 오름차순으로 정렬 (1 to 50은 시간 짧은게 1등)
+      rankings.sort((a, b) => a.score - b.score);
+
+      // 상위 최대 10개까지만 자르기
+      rankings = rankings.slice(0, 10);
+
+      // 4. HTML 렌더링
+      const top3Container = document.getElementById('top3-container');
+      const listContainer = document.getElementById('list-container');
+      
+      top3Container.innerHTML = '';
+      listContainer.innerHTML = '';
+
+      // Top 3 렌더링 (2등, 1등, 3등 순서로 배치하기 위함)
+      const top3Order = [1, 0, 2]; // 인덱스: 2등(1), 1등(0), 3등(2)
+      
+      top3Order.forEach((rankIndex) => {
+        if (!rankings[rankIndex]) return; // 데이터가 모자란 경우 방어코드
+        const ranker = rankings[rankIndex];
+        const actualRank = rankIndex + 1;
+        const isMeClass = ranker.isMe ? 'highlight-my-rank' : '';
+        
+        let crown = '';
+        let cardClass = '';
+        let tagText = '';
+        if (actualRank === 1) { crown = '👑'; cardClass = 'first'; tagText = '1st Place'; }
+        if (actualRank === 2) { crown = '🥈'; cardClass = 'second'; tagText = '2nd Place'; }
+        if (actualRank === 3) { crown = '🥉'; cardClass = 'third'; tagText = '3rd Place'; }
+
+        const cardHtml = `
+          <div class="top-card ${cardClass} ${isMeClass}">
+            <div class="crown">${crown}</div>
+            <div class="avatar-img" style="background:${ranker.bg}">${ranker.emoji}</div>
+            <div class="top-name" ${ranker.isMe ? 'style="color: var(--primary);"' : ''}>${ranker.name}</div>
+            <div class="top-score">${ranker.score.toFixed(3)} sec</div>
+            <div class="top-tag">${tagText}</div>
+          </div>
+        `;
+        top3Container.innerHTML += cardHtml;
+      });
+
+      // 4등부터 리스트 렌더링
+      for (let i = 3; i < rankings.length; i++) {
+        const ranker = rankings[i];
+        const actualRank = i + 1;
+        const isMeStyle = ranker.isMe ? 'background-color: rgba(255, 127, 80, 0.15); border-radius: 12px; border: 1px solid rgba(255, 127, 80, 0.3); padding: 10px; margin: -10px;' : '';
+        const isMeTextClass = ranker.isMe ? 'color: var(--primary); font-weight: bold;' : '';
+
+        const itemHtml = `
+          <div class="list-item" style="${isMeStyle}">
+            <div class="list-rank">${actualRank}<br><span class="list-tag">Top 10</span></div>
+            <div class="list-avatar" style="background:${ranker.bg}">${ranker.emoji}</div>
+            <div class="list-name" style="${isMeTextClass}">${ranker.name}</div>
+            <div class="list-score">${ranker.score.toFixed(3)} sec</div>
+          </div>
+        `;
+        listContainer.innerHTML += itemHtml;
+      }
+    }
+
+    function initGame() {
+      currentNumber = 1;
+      isPlaying = false;
+      modal.style.display = 'none';
+      rankingView.style.display = 'none';
+      targetDisplay.textContent = 'Target: 1';
+      timerDisplay.textContent = '0.000 sec';
+      timerDisplay.style.color = 'var(--primary)';
+      clearInterval(timerInterval);
+      timerInterval = null;
+      
+      let nums = Array.from({length: 25}, (_, i) => i + 1);
+      nums.sort(() => Math.random() - 0.5);
+      
+      tiles = nums.map((num, idx) => ({ id: idx, number: num }));
+      renderGrid();
+    }
+
+    function startGame() {
+      isPlaying = true;
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const timeElapsed = (Date.now() - startTime) / 1000;
+        if (timeElapsed >= 60) {
+          timerDisplay.textContent = '60.000 sec';
+          failGame();
+        } else {
+          timerDisplay.textContent = timeElapsed.toFixed(3) + ' sec';
+        }
+      }, 10);
+    }
+
+    function endGame() {
+      isPlaying = false;
+      clearInterval(timerInterval);
+      const timeElapsed = (Date.now() - startTime) / 1000;
+      currentScoreValue = timeElapsed; // 숫자 기록 저장
+      currentScoreText = timeElapsed.toFixed(3) + ' sec';
+      finalTime.innerHTML = 'Clear Time:<br>' + currentScoreText + '!';
+      finalTime.style.color = 'var(--primary)';
+      modal.style.display = 'flex';
+      targetDisplay.textContent = 'Clear!';
+      
+      updateRankingView(); // 랭킹 업데이트
+    }
+
+    function failGame() {
+      isPlaying = false;
+      clearInterval(timerInterval);
+      currentScoreValue = null; // 실패시 기록 없음
+      currentScoreText = 'Fail (60초 초과)';
+      finalTime.innerHTML = 'Time Over 😢<br>60초를 초과했습니다!';
+      finalTime.style.color = '#FF4500';
+      timerDisplay.style.color = '#FF4500';
+      modal.style.display = 'flex';
+      targetDisplay.textContent = 'Fail!';
+      
+      updateRankingView(); // 랭킹 업데이트
+    }
+
+    function handleTileClick(index) {
+      const tile = tiles[index];
+      if (tile.number === 0) return;
+      
+      if (!isPlaying && currentNumber === 1 && tile.number === 1) {
+        startGame();
+      }
+
+      if (tile.number === currentNumber) {
+        if (currentNumber <= 25) {
+          tiles[index].number = currentNumber + 25;
+        } else {
+          tiles[index].number = 0;
+        }
+        
+        currentNumber++;
+        if (currentNumber <= 50) {
+          targetDisplay.textContent = 'Target: ' + currentNumber;
+        }
+        renderGrid();
+
+        if (currentNumber > 50) {
+          endGame();
+        }
+      }
+    }
+
+    function renderGrid() {
+      gridEl.innerHTML = '';
+      tiles.forEach((tile, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'tile-button';
+        if (tile.number === 0) {
+          btn.classList.add('empty');
+        } else {
+          btn.textContent = tile.number;
+          btn.onclick = () => handleTileClick(index);
+        }
+        gridEl.appendChild(btn);
+      });
+    }
+
+    function showRanking() {
+      modal.style.display = 'none';
+      if (currentScoreText) {
+        myFinalScore.textContent = currentScoreText;
+        myRecordSection.style.display = 'block';
+      }
+      rankingView.style.display = 'flex';
+    }
+
+    function hideRanking() {
+      rankingView.style.display = 'none';
+      modal.style.display = 'flex';
+    }
+
+    // 초기 로딩 시 한 번 렌더링
+    updateRankingView();
+    initGame();
+  </script>
+</body>
+</html>
